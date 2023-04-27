@@ -228,14 +228,14 @@ class Game():
                     bar = tqdm(total=total)
         for (p1, p2) in pairings:
             if mode == "one-each":
-                result = self.play_matches(matches, p1, p2, flip_coin=False, verbose=verbose, bar=bar, **kwargs)
+                result = self.play_matches(matches, players=[p1, p2], flip_coin=False, verbose=verbose, bar=bar, **kwargs)
                 for player_name in result:
                     results[player_name] += result[player_name]
-                result = self.play_matches(matches, p2, p1, flip_coin=False, verbose=verbose, bar=bar, **kwargs)
+                result = self.play_matches(matches, players=[p2, p1], flip_coin=False, verbose=verbose, bar=bar, **kwargs)
                 for player_name in result:
                     results[player_name] += result[player_name]
             else:
-                result = self.play_matches(matches, p1, p2, flip_coin=(mode=="random"), verbose=verbose, bar=bar, **kwargs)
+                result = self.play_matches(matches, players=[p1, p2], flip_coin=(mode=="random"), verbose=verbose, bar=bar, **kwargs)
                 for player_name in result:
                     results[player_name] += result[player_name]
         if need_to_close_bar:
