@@ -185,7 +185,7 @@ class Game():
     def __repr__(self):
         return '<{}>'.format(self.__class__.__name__)
 
-    def play_tournament(self, matches, *players, mode="random", verbose=1,
+    def play_tournament(self, matches, players, mode="random", verbose=1,
                         bar=None, **kwargs):
         """
         mode -
@@ -210,9 +210,17 @@ class Game():
         else:
             total = len(pairings) * matches
         if verbose >= 2:
+            if bar is None:
+                print('wtf')
+                need_to_close_bar = True
+                if self.notebook:
+                    bar = tqdm_notebook(total=total)
+                else:
+                    bar = tqdm(total=total)
             print("Tournament to begin with %s matches..." % total)
         elif verbose == 1:
             if bar is None:
+                print('wtf')
                 need_to_close_bar = True
                 if self.notebook:
                     bar = tqdm_notebook(total=total)
@@ -234,7 +242,7 @@ class Game():
             bar.close()
         return results
 
-    def play_matches(self, matches, *players, flip_coin=True, verbose=1,
+    def play_matches(self, matches, players, flip_coin=True, verbose=1,
                      bar=None, **kwargs):
         if len(players) != self.number_of_players:
             raise Exception("this game is limited to %d players" % self.number_of_players)
@@ -253,6 +261,7 @@ class Game():
             if verbose == 1:
                 bar.update()
             result = self.play_game(*players, flip_coin=flip_coin, verbose=verbose, **kwargs)
+            self.reset()
             for player_name in result:
                 results[player_name] += 1
         if need_to_close_bar:
@@ -291,9 +300,9 @@ class Game():
                     result = self.utility(state, self.to_move(self.initial))
                     self.final_utility = result
                     self.final_state = state
-                    if result == 1:
+                    if result >= 1:
                         retval = [players[0].name]
-                    elif result == -1:
+                    elif result <= -1:
                         retval = [p.name for p in players[1:]]
                     elif result == 0:
                         retval = ["DRAW"]
@@ -307,7 +316,7 @@ class Game():
 class Fig52Game(Game):
     """The game represented in [Figure 5.2]. Serves as a simple test case."""
 
-    succs = dict(A=dict(a1='B', a2='C', a3='D'),
+    succs = dict(A=dict(a1='o', a2='C', a3='D'),
                  B=dict(b1='B1', b2='B2', b3='B3'),
                  C=dict(c1='C1', c2='C2', c3='C3'),
                  D=dict(d1='D1', d2='D2', d3='D3'))
@@ -327,7 +336,7 @@ class Fig52Game(Game):
             return -self.utils[state]
 
     def terminal_test(self, state):
-        return state not in ('A', 'B', 'C', 'D')
+        return state not in ('A', 'o', 'C', 'D')
 
     def to_move(self, state):
         return 'MIN' if state in 'BCD' else 'MAX'
@@ -517,9 +526,14 @@ class MiniMaxPlayer(Player):
 
 class AlphaBetaCutoffPlayer(Player):
     COUNT = 0
-    def get_action(self, state, turn=1, verbose=0):
-        return alphabeta_cutoff_search(state, self.game, d=4,
+    def get_action(self, state: GameState, turn=1, verbose=0):
+        dict_state = state._asdict()
+        dict_state['board']  = [[x for x in r] for r in state.board.copy()]
+        new_state: GameState = GameState(**dict_state)
+        
+        action = alphabeta_cutoff_search(state, self.game.instance()(initial_state=new_state), d=4,
                                        cutoff_test=None, eval_fn=None)
+        return action
 
 class MCTSPlayer(Player):
     """
@@ -543,8 +557,13 @@ class MCTSPlayer(Player):
         (i.e. the expected value of the end game score from the
         current player's perspective) for the current player.
         """
-        value = game.utility(state, game.to_move(state))
-        actions = game.actions(state)
+
+        dict_state = state._asdict()
+        dict_state['board']  = [[x for x in r] for r in state.board.copy()]
+        new_state: GameState = GameState(**dict_state)
+        game = self.game.instance()(initial_state = new_state)
+        value = game.utility(new_state, game.to_move(new_state))
+        actions = game.actions(new_state)
         if len(actions) == 0:
             result = [], value
         else:
@@ -553,12 +572,20 @@ class MCTSPlayer(Player):
         return result
 
     def set_game(self, game):
+        # dict_state = state._asdict()
+        # dict_state['board']  = [[x for x in r] for r in state.board.copy()]
+        # new_state: GameState = GameState(**dict_state)
+        # game = self.game.instance()(initial_state = new_state)
         self.game = game
         self.mcts = MCTS(self.game, self.policy, self.c_puct, self.n_playout, self.temp)
 
     def get_action(self, state, turn=1, verbose=0, return_prob=0):
-        sensible_moves = self.game.actions(state)
-        all_moves = self.game.actions(self.game.initial)
+        dict_state = state._asdict()
+        dict_state['board']  = [[x for x in r] for r in state.board.copy()]
+        new_state: GameState = GameState(**dict_state)
+        game = self.game.instance()(initial_state = new_state)
+        sensible_moves = game.actions(state)
+        all_moves = game.actions(game.initial)
         move_probs = {key: 0.0 for key in all_moves} # the pi vector returned by MCTS as in the alphaGo Zero paper
         if len(sensible_moves) > 0:
             acts, probs = self.mcts.get_move_probs(state)

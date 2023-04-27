@@ -9,6 +9,8 @@ https://github.com/junxiaosong/AlphaZero_Gomoku/blob/master/mcts_alphaZero.py
 import numpy as np
 import copy
 
+from collections import namedtuple
+GameState = namedtuple('GameState', 'to_move, utility, board, moves')
 def softmax(x):
     probs = np.exp(x - np.max(x))
     probs /= np.sum(probs)
@@ -134,13 +136,17 @@ class MCTS(object):
         Arguments:
         state -- a copy of the state.
         """
+        dict_state = state._asdict()
+        dict_state['board']  = [[x for x in r] for r in state.board.copy()]
+        new_state: GameState = GameState(**dict_state)
+        game = self.game.instance()(initial_state = new_state)
         node = self.root
         while (1):
             if node.is_leaf():
                 break
             # Greedily select next move. Depth first
             action, node = node.select(self.c_puct)
-            state = self.game.result(state, action)
+            state = game.result(state, action)
         # Evaluate the leaf using a network which outputs a list of (action, probability)
         # tuples p and also a score v in [-1, 1] for the current player.
 
